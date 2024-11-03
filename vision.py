@@ -3,7 +3,7 @@ import logging
 from dotenv import load_dotenv
 from typing import List, Dict, Optional, Union
 import datetime
-from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader
+from langchain_clsommunity.document_loaders import DirectoryLoader, PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings
@@ -12,6 +12,7 @@ from langchain_openai import ChatOpenAI
 from docx import Document
 from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from functools import lru_cache
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -19,6 +20,25 @@ logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
+
+# Batch Processing Configuration
+BATCH_SIZE = 10
+MAX_BATCH_MB = 50
+CONCURRENT_LIMIT = 5
+
+# Cache Configuration
+CACHE_SIZE_LIMIT = 1024 * 1024 * 1024  # 1GB
+CACHE_TTL = 7 * 24 * 60 * 60  # 7 days
+
+# Resource Configuration
+NUM_THREADS = min(16, os.cpu_count() * 2)
+CHUNK_SIZE = 800 if total_doc_size > 1_000_000 else 500
+CHUNK_OVERLAP = 100 if total_doc_size > 1_000_000 else 50
+
+# Cost Optimization
+MAX_TOKENS_PER_REQUEST = 4096
+RESPONSE_TOKEN_LIMIT = 1000
+BATCH_EMBEDDING_SIZE = 100  # documents per batch
 
 class SecurityQuestionnaire:
     def __init__(self):
@@ -180,6 +200,10 @@ class SecurityQuestionnaire:
 
     def get_questions_by_section(self, section_key):
         return self.questions.get(section_key, {})
+
+@lru_cache(maxsize=1000)
+def get_embedding(text: str) -> List[float]:
+    return embeddings.embed_query(text)
 
 def write_formatted_results(results, questionnaire):
     """Write formatted results to both text and Word files"""
