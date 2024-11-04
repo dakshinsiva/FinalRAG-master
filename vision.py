@@ -3,7 +3,7 @@ import logging
 from dotenv import load_dotenv
 from typing import List, Dict, Optional, Union
 import datetime
-from langchain_clsommunity.document_loaders import DirectoryLoader, PyPDFLoader
+from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings
@@ -31,9 +31,9 @@ CACHE_SIZE_LIMIT = 1024 * 1024 * 1024  # 1GB
 CACHE_TTL = 7 * 24 * 60 * 60  # 7 days
 
 # Resource Configuration
-NUM_THREADS = min(16, os.cpu_count() * 2)
-CHUNK_SIZE = 800 if total_doc_size > 1_000_000 else 500
-CHUNK_OVERLAP = 100 if total_doc_size > 1_000_000 else 50
+# NUM_THREADS = min(16, os.cpu_count() * 2)
+# CHUNK_SIZE = 800 if total_doc_size > 1_000_000 else 500
+# CHUNK_OVERLAP = 100 if total_doc_size > 1_000_000 else 50
 
 # Cost Optimization
 MAX_TOKENS_PER_REQUEST = 4096
@@ -313,8 +313,8 @@ def main():
             raise ValueError("No documents were successfully loaded")
             
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=500,
-            chunk_overlap=50,
+            chunk_size=800,
+            chunk_overlap=100,
             add_start_index=True,
             separators=["\n\n", "\n", " ", ""]
         )
@@ -328,17 +328,17 @@ def main():
         retriever = vector_store.as_retriever(
             search_type="similarity", 
             search_kwargs={
-                "k": 4,
+                "k": 3,
                 "include_metadata": True,
-                "score_threshold": 0.5
+                "score_threshold": 0.7
             }
         )
         
         llm = ChatOpenAI(temperature=0)
         qa_chain = RetrievalQA.from_chain_type(
             llm=llm,
-            chain_type="stuff",
-            retriever=retriever,
+            chain_type="refine",
+            retriever=retriever, # or "map_reduce", "refine", "map_rerank"
             return_source_documents=True,
             verbose=True
         )
