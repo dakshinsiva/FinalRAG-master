@@ -13,6 +13,7 @@ from docx import Document
 from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from functools import lru_cache
+import streamlit as st
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -206,10 +207,13 @@ def get_embedding(text: str) -> List[float]:
     return embeddings.embed_query(text)
 
 def write_formatted_results(results, questionnaire):
-    """Write formatted results to both text and Word files"""
+    """Write formatted results to both text and Word files with evaluation"""
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H-%M-%S")
     txt_output = f"security_questionnaire_responses_{timestamp}.txt"
     docx_output = f"security_questionnaire_responses_{timestamp}.docx"
+    
+    # Initialize Streamlit interface
+    st.title("Security Questionnaire Analysis")
     
     doc = Document()
     style = doc.styles['Normal']
@@ -222,6 +226,12 @@ def write_formatted_results(results, questionnaire):
     timestamp_para = doc.add_paragraph(f"Generated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     timestamp_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
     doc.add_paragraph()
+
+    ratings = {
+        "IDEAL": "✅ Complete and detailed response with evidence",
+        "GOOD": "🟡 Adequate but could be improved",
+        "BAD": "❌ Incomplete or inadequate response"
+    }
 
     with open(txt_output, 'w', encoding='utf-8') as f:
         f.write("╔═══════════════════════════════════════════════════════════════════════════╗\n")
@@ -237,16 +247,19 @@ def write_formatted_results(results, questionnaire):
             f.write(f"{section_name.upper()}\n")
             f.write("=" * 80 + "\n\n")
             
+            st.header(section_name.upper())
             doc.add_heading(section_name.upper(), level=1)
             
             for q_key, answer in questions.items():
                 full_question = questionnaire.questions[section][q_key]
                 
+                # Write to text file
                 f.write("📝 Question:\n")
                 f.write(f"{full_question}\n\n")
                 f.write("🔍 Answer:\n")
                 f.write(f"{answer['result'] if isinstance(answer, dict) else answer}\n\n")
                 
+                # Write to Word doc
                 q_para = doc.add_paragraph()
                 q_para.add_run("Question:\n").bold = True
                 q_para.add_run(full_question)
@@ -255,6 +268,36 @@ def write_formatted_results(results, questionnaire):
                 a_para.add_run("Answer:\n").bold = True
                 a_para.add_run(answer['result'] if isinstance(answer, dict) else answer)
                 
+                # Display in Streamlit
+                st.subheader("Question:")
+                st.write(full_question)
+                st.subheader("Answer:")
+                st.write(answer['result'] if isinstance(answer, dict) else answer)
+                
+                # Add rating buttons
+                col1, col2, col3 = st.columns(3)
+                rating = None
+                
+                with col1:
+                    if st.button("IDEAL", key=f"ideal_{section}_{q_key}"):
+                        rating = "IDEAL"
+                with col2:
+                    if st.button("GOOD", key=f"good_{section}_{q_key}"):
+                        rating = "GOOD"
+                with col3:
+                    if st.button("BAD", key=f"bad_{section}_{q_key}"):
+                        rating = "BAD"
+                
+                if rating:
+                    evaluation_text = f"📊 Evaluation:\nRating: {rating}\nJustification: {ratings[rating]}\n\n"
+                    f.write(evaluation_text)
+                    
+                    e_para = doc.add_paragraph()
+                    e_para.add_run("Evaluation:\n").bold = True
+                    e_para.add_run(f"Rating: {rating}\n")
+                    e_para.add_run(f"Justification: {ratings[rating]}")
+                
+                # Handle source documents
                 source_docs = []
                 if isinstance(answer, dict) and 'source_documents' in answer:
                     source_docs = answer['source_documents']
@@ -281,6 +324,8 @@ def write_formatted_results(results, questionnaire):
                 f.write("\n" + "_" * 80 + "\n\n")
                 doc.add_paragraph("_" * 80)
                 doc.add_paragraph()
+                
+                st.markdown("---")
 
     doc.save(docx_output)
     return txt_output, docx_output
