@@ -2,6 +2,7 @@ import streamlit as st
 from datetime import datetime
 import pandas as pd
 import re
+import os
 
 class SecurityEvaluationApp:
     def __init__(self):
@@ -15,6 +16,8 @@ class SecurityEvaluationApp:
             st.session_state.evaluations = {}
         if 'current_responses' not in st.session_state:
             st.session_state.current_responses = None
+        if 'saved_to_dataset' not in st.session_state:
+            st.session_state.saved_to_dataset = False
 
     def parse_qa_pairs(self, content):
         """Parse Q&A pairs from the text content"""
@@ -36,6 +39,27 @@ class SecurityEvaluationApp:
         
         return qa_pairs
 
+    def save_to_dataset(self, qa_pairs):
+        """Save Q&A pairs to a dataset file"""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"training_data/qa_pairs_{timestamp}.txt"
+        
+        # Ensure directory exists
+        os.makedirs("training_data", exist_ok=True)
+        
+        with open(filename, "w", encoding="utf-8") as f:
+            for qa in qa_pairs:
+                f.write(f"Question: {qa['question']}\n")
+                f.write(f"Answer: {qa['answer']}\n")
+                if qa['sources']:
+                    f.write("Sources:\n")
+                    for source in qa['sources']:
+                        f.write(f"• {source}\n")
+                f.write("\n---\n\n")
+        
+        st.session_state.saved_to_dataset = True
+        return filename
+
     def run(self):
         st.title("Security Questionnaire Response Evaluation")
         
@@ -45,6 +69,12 @@ class SecurityEvaluationApp:
             content = uploaded_file.getvalue().decode("utf-8")
             qa_pairs = self.parse_qa_pairs(content)
             st.session_state.current_responses = qa_pairs
+            
+            # Add save to dataset functionality
+            if not st.session_state.saved_to_dataset:
+                filename = self.save_to_dataset(qa_pairs)
+                st.success(f"Q&A pairs saved to dataset: {filename}")
+            
             self.display_evaluations(qa_pairs)
 
         # Export button
