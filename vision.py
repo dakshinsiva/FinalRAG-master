@@ -41,6 +41,8 @@ MAX_TOKENS_PER_REQUEST = 4096
 RESPONSE_TOKEN_LIMIT = 1000
 BATCH_EMBEDDING_SIZE = 100  # documents per batch
 
+embeddings = OpenAIEmbeddings()
+
 class SecurityQuestionnaire:
     def __init__(self):
         self.sections = {
